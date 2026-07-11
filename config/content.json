@@ -1,0 +1,132 @@
+{
+  "meta": {
+    "title": "Bloom Template",
+    "description": "A customizable wedding invitation template"
+  },
+  "event": {
+    "weddingDate": "2026-10-11"
+  },
+  "content": {
+    "intro": {
+      "enabled": true,
+      "text": {}
+    },
+    "hero": {
+      "enabled": true,
+      "text": {
+        "nameFirst": { "selector": "#hero h1 span:nth-child(1)", "text": "Wenjie" },
+        "ampersand": { "selector": "#hero h1 span:nth-child(2)", "text": "&" },
+        "nameSecond": { "selector": "#hero h1 span:nth-child(3)", "text": "Wendy" }
+      }
+    },
+    "countdown": {
+      "enabled": true,
+      "text": {
+        "title": { "selector": "#countdown h2", "text": "Countdown" }
+      }
+    },
+    "welcome": {
+      "enabled": true,
+      "text": {
+        "title": { "selector": "#welcome h2", "text": "Welcome" },
+        "familiesLine": { "selector": "#welcome > div > p", "text": "Together with our families" },
+        "nameFirst": { "selector": "#welcome h3:nth-of-type(1)", "text": "Wenjie" },
+        "nameConnector": { "selector": "#welcome .mt-10 p", "text": "and" },
+        "nameSecond": { "selector": "#welcome h3:nth-of-type(2)", "text": "Wendy" },
+        "invitationLine": { "selector": "#welcome .mt-12 > p", "text": "invite you to join us for a celebration as we toast to our new chapter together" },
+        "dayLabel": { "selector": "#welcome .mt-12 span", "text": "on Sunday" },
+        "dateLine": { "selector": "#welcome .mt-12 div p", "html": "11th of October, 2026" }
+      }
+    },
+    "weddingEvents": {
+      "enabled": true,
+      "map": {
+        "query": "Mandai Rainforest Resort, Singapore"
+      },
+      "text": {
+        "title": { "selector": "#wedding-events h2", "text": "Banquet\n& Reception" },
+        "eyebrow": { "selector": "#wedding-events h2 + span + p", "text": "Where we celebrate" },
+        "venueName": { "selector": "#wedding-events h3", "text": "Mandai Rainforest Resort" },
+        "venueLocation": { "selector": "#wedding-events h3 + p", "text": "by Banyan Tree" },
+        "dateLine1": { "selector": "#wedding-events .space-y-3 > div:first-child > span:first-child > span:nth-child(1)", "text": "Sunday, 11th" },
+        "dateLine2": { "selector": "#wedding-events .space-y-3 > div:first-child > span:first-child > span:nth-child(2)", "text": "of October, 2026" },
+        "time": { "selector": "#wedding-events .space-y-3 > div:first-child > span:nth-child(3)", "text": "11:30 AM" },
+        "addressLine1": { "selector": "#wedding-events .space-y-3 > div:last-child > span:nth-child(1)", "text": "Meranti Ballroom" },
+        "addressLine2": { "selector": "#wedding-events .space-y-3 > div:last-child > span:nth-child(2)", "text": "60 Mandai Lake Rd, Singapore 729979" },
+        "openInMaps": { "selector": "#wedding-events > div:last-child > button:nth-child(1)", "text": "Open in Maps" },
+        "addToCalendar": { "selector": "#wedding-events > div:last-child > button:nth-child(2)", "text": "Add to Calendar" }
+      }
+    },
+    "dressCode": {
+      "enabled": true,
+      "text": {
+        "title": { "selector": "#dress-code h2", "text": "Dress Code" },
+        "attire": { "selector": "#dress-code p", "text": "Cocktail Attire" },
+        "attireNote": {
+          "selector": "#dress-code p",
+          "text": "I know what you are thinking, we are not dressing according to the \"Mandai\" theme =P",
+          "insert": "after",
+          "tagName": "p",
+          "className": "font-body text-sm md:text-base text-sage-dark/75 italic mt-3 max-w-xl mx-auto leading-relaxed"
+        },
+        "illustrationAlt": { "selector": "#dress-code img", "attribute": "alt", "text": "Black tie attire illustration" }
+      }
+    },
+    "dayProgram": {
+      "enabled": true,
+      "text": {
+        "title": { "selector": "#day-program h2", "text": "Wedding Day Programme" },
+        "item1Time": { "selector": "#day-program .space-y-6 > div:nth-child(1) > p:nth-child(1)", "text": "8:30 AM" },
+        "item1Label": { "selector": "#day-program .space-y-6 > div:nth-child(1) > p:nth-child(2)", "text": "Solemnization" },
+        "item2Time": { "selector": "#day-program .space-y-6 > div:nth-child(2) > p:nth-child(1)", "text": "10:30 AM" },
+        "item2Label": { "selector": "#day-program .space-y-6 > div:nth-child(2) > p:nth-child(2)", "text": "Tea Ceremony" },
+        "item3Time": { "selector": "#day-program .space-y-6 > div:nth-child(3) > p:nth-child(1)", "text": "11:30 AM" },
+        "item3Label": { "selector": "#day-program .space-y-6 > div:nth-child(3) > p:nth-child(2)", "text": "Reception" },
+        "item4Time": { "selector": "#day-program .space-y-6 > div:nth-child(4) > p:nth-child(1)", "text": "12:00 PM" },
+        "item4Label": { "selector": "#day-program .space-y-6 > div:nth-child(4) > p:nth-child(2)", "text": "Lunch Banquet" }
+      }
+    },
+    "ourStory": {
+      "enabled": true,
+      "text": {
+        "title": { "selector": "#our-story h2", "text": "How it all started..." },
+        "toggleClosed": { "text": "Our Story" },
+        "toggleOpen": { "text": "Hide Story" },
+        "paragraph1": {
+          "selector": "#our-story-content .pt-10 > div:nth-child(1) p",
+          "text": "They say timing is everything, and it took us a decade to find out why. We first met as coursemates at NTU, but it was a student exchange trip to Japan that first brought us together as friends. We kept in touch briefly, but it took ten whole years for the stars to align."
+        },
+        "paragraph2": {
+          "selector": "#our-story-content .pt-10 > div:nth-child(2) p",
+          "text": "When Wenjie asked Wendy out for a casual catch-up, neither of us expected what happened next. Seeing each other after all those years, the connection was undeniable and the sparks were instant. That one reunion changed our lives forever, and now we couldn't be more excited to celebrate our love story with all of you."
+        }
+      }
+    },
+    "weekend": {
+      "enabled": false,
+      "text": {
+        "title": { "selector": "#important-info h2", "text": "The Weekend" }
+      }
+    },
+    "transport": {
+      "enabled": true,
+      "text": {}
+    },
+    "accommodations": {
+      "enabled": false,
+      "text": {
+        "title": { "selector": "#accommodations h2", "text": "Travel & Stay" }
+      }
+    },
+    "rsvp": {
+      "enabled": true,
+      "text": {
+        "title": { "selector": "#rsvp h2", "text": "RSVP" }
+      }
+    },
+    "footer": {
+      "enabled": true,
+      "text": {}
+    }
+  }
+}
