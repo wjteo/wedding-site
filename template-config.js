@@ -741,6 +741,110 @@
     }
   }
 
+  function applyRsvpSubmission(config) {
+    const rsvpConfig = config && config.content && config.content.rsvp;
+    const endpoint =
+      rsvpConfig && rsvpConfig.submission && typeof rsvpConfig.submission.endpoint === "string"
+        ? rsvpConfig.submission.endpoint.trim()
+        : "";
+    if (!endpoint) return;
+
+    function findRadiogroupByLabelText(form, labelSubstring) {
+      const labels = Array.from(form.querySelectorAll("label"));
+      const label = labels.find((l) => (l.textContent || "").toLowerCase().includes(labelSubstring));
+      if (!label || !label.parentElement) return null;
+      return label.parentElement.querySelector('[role="radiogroup"]');
+    }
+
+    function getRadioValue(radiogroup) {
+      if (!radiogroup) return "";
+      const checked = radiogroup.querySelector('[role="radio"][data-state="checked"]');
+      return checked ? checked.getAttribute("value") || "" : "";
+    }
+
+    function showStatus(form, submitButton, message, isError) {
+      let status = form.querySelector(".template-rsvp-status");
+      if (!status) {
+        status = document.createElement("p");
+        status.className = "template-rsvp-status text-center text-sm mt-3";
+        submitButton.insertAdjacentElement("afterend", status);
+      }
+      status.textContent = message;
+      status.style.color = isError ? "#b91c1c" : "#3f6212";
+    }
+
+    let attempts = 0;
+    const maxAttempts = 180;
+
+    function attachOverride() {
+      attempts += 1;
+      const form = document.querySelector("#rsvp form");
+      const submitButton = form ? form.querySelector('button[type="submit"]') : null;
+
+      if (form && submitButton && !form.__templateRsvpOverrideApplied) {
+        form.addEventListener(
+          "submit",
+          (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const fullNameEl = form.querySelector("#fullName");
+            const messageEl = form.querySelector("#message");
+            const websiteEl = form.querySelector("#website");
+            const guestCountEl = form.querySelector("span.w-10.text-center");
+            const attendingGroup = findRadiogroupByLabelText(form, "attending");
+            const transportGroup = findRadiogroupByLabelText(form, "transportation");
+
+            const payload = {
+              fullName: fullNameEl ? fullNameEl.value.trim() : "",
+              attending: getRadioValue(attendingGroup),
+              guestCount: guestCountEl ? parseInt(guestCountEl.textContent.trim(), 10) : 1,
+              transportation: getRadioValue(transportGroup),
+              message: messageEl ? messageEl.value.trim() : "",
+              website: websiteEl ? websiteEl.value : ""
+            };
+
+            submitButton.disabled = true;
+            showStatus(form, submitButton, "Sending...", false);
+
+            fetch(endpoint, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            })
+              .then((response) =>
+                response
+                  .json()
+                  .catch(() => ({}))
+                  .then((data) => ({ ok: response.ok, data }))
+              )
+              .then(({ ok, data }) => {
+                if (ok && data && data.ok !== false) {
+                  showStatus(form, submitButton, "Thank you! Your RSVP has been received.", false);
+                } else {
+                  submitButton.disabled = false;
+                  showStatus(form, submitButton, (data && data.error) || "Something went wrong. Please try again.", true);
+                }
+              })
+              .catch(() => {
+                submitButton.disabled = false;
+                showStatus(form, submitButton, "Network error. Please try again.", true);
+              });
+          },
+          true
+        );
+        form.__templateRsvpOverrideApplied = true;
+        return;
+      }
+
+      if (attempts < maxAttempts) {
+        requestAnimationFrame(attachOverride);
+      }
+    }
+
+    requestAnimationFrame(attachOverride);
+  }
+
   function applyConfig(config) {
     setMeta(config);
     applySectionToggles(config);
@@ -753,6 +857,7 @@
     applyTransportModes(config);
     applyTransportMap();
     applyTransportDecor();
+    applyRsvpSubmission(config);
     hideRsvpPortrait();
     hideFooterCredit();
   }

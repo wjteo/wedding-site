@@ -153,6 +153,9 @@
       "enabled": true,
       "text": {
         "title": { "selector": "#rsvp h2", "text": "RSVP" }
+      },
+      "submission": {
+        "endpoint": "https://rsvp-api-zeta.vercel.app/api/rsvp"
       }
     },
     "footer": {
