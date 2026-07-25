@@ -412,17 +412,34 @@
       primaryWrappers.pop().remove();
     }
 
+    // The built marquee's images are "h-80 w-auto" (height fixed, width derived
+    // from each image's own aspect ratio). Before an image loads, the browser
+    // uses its width/height attributes (4:5, from the original template photos)
+    // to reserve space; once the actual photo loads, real user photos are
+    // mostly square, so the box visibly widens. With 44 images loading
+    // progressively (loading="lazy"), each one widening the marquee track mid
+    // scroll causes the CSS animation's translateX(-50%) - resolved against the
+    // track's *current* width - to jump every time. Locking the box to a fixed
+    // aspect ratio (matching the original 320x400 attributes) makes every
+    // image's rendered width deterministic from the start, independent of its
+    // real dimensions, so the track width never changes after load.
+    const GALLERY_ASPECT_RATIO = "4 / 5";
+
     primaryWrappers.forEach((wrapper, index) => {
       const img = wrapper.querySelector("img");
       if (!img) return;
       img.setAttribute("src", paths[index]);
       img.setAttribute("alt", `Gallery moment ${index + 1}`);
+      img.style.aspectRatio = GALLERY_ASPECT_RATIO;
     });
 
     primaryWrappers.forEach((wrapper) => {
       const clone = wrapper.cloneNode(true);
       const clonedImg = clone.querySelector("img");
-      if (clonedImg) clonedImg.setAttribute("alt", "");
+      if (clonedImg) {
+        clonedImg.setAttribute("alt", "");
+        clonedImg.style.aspectRatio = GALLERY_ASPECT_RATIO;
+      }
       marquee.appendChild(clone);
     });
   }
