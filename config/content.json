@@ -152,7 +152,9 @@
     "rsvp": {
       "enabled": true,
       "text": {
-        "title": { "selector": "#rsvp h2", "text": "RSVP" }
+        "title": { "selector": "#rsvp h2", "text": "RSVP" },
+        "subtitle": { "selector": "#rsvp p.section-eyebrow", "text": "Kindly Respond By 11 August 2026" },
+        "messageLabel": { "selector": "#rsvp label[for='message']", "text": "Do you have a personal message for us?" }
       },
       "submission": {
         "endpoint": "https://rsvp-api-zeta.vercel.app/api/rsvp"

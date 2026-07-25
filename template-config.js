@@ -741,6 +741,186 @@
     }
   }
 
+  function applyRsvpQuestionsRedesign() {
+    const CHILDREN_MAX = 9;
+    const CHECKED_DOT_HTML =
+      '<span data-state="checked" class="flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle h-2.5 w-2.5 fill-current text-current"><circle cx="12" cy="12" r="10"></circle></svg></span>';
+
+    // The "attending" answer conditionally mounts/unmounts the adults-count and
+    // transportation fields elsewhere in this form (toggling to "Regretfully
+    // declines" and back recreates fresh DOM nodes with none of our patches
+    // applied). So this whole sync has to be safely re-runnable, driven by a
+    // MutationObserver watching for that remount rather than a one-shot setup.
+    function syncRsvpQuestions(form) {
+      const labels = Array.from(form.querySelectorAll("label"));
+
+      // "Number of guests attending" -> "Number of adults attending", plus a new
+      // children counter cloned from the same stepper markup (the original stepper
+      // is a React-controlled widget with no native <input>, so a fresh click
+      // handler is wired up here for the cloned copy).
+      const adultsLabel = labels.find((l) => /number of (guests|adults) attending/i.test(l.textContent || ""));
+      const adultsBlock = adultsLabel ? adultsLabel.closest(".space-y-3") : null;
+
+      // Clean up any previous clone first so a remount never leaves an orphaned
+      // or duplicated children counter behind.
+      form.querySelectorAll(".template-children-count").forEach((el) => el.remove());
+
+      if (adultsLabel && adultsBlock) {
+        adultsLabel.textContent = "Number of adults attending *";
+
+        const adultsCountEl = adultsBlock.querySelector("span.w-10.text-center");
+        if (adultsCountEl) adultsCountEl.setAttribute("data-rsvp-field", "adultCount");
+
+        const childrenBlock = adultsBlock.cloneNode(true);
+        childrenBlock.classList.add("template-children-count");
+
+        const childrenLabel = childrenBlock.querySelector("label");
+        if (childrenLabel) {
+          childrenLabel.textContent = "Number of children (below 12 years old) attending *";
+        }
+
+        const buttons = childrenBlock.querySelectorAll("button");
+        const minusBtn = buttons[0];
+        const plusBtn = buttons[1];
+        const countEl = childrenBlock.querySelector("span.w-10.text-center");
+        if (countEl) countEl.setAttribute("data-rsvp-field", "childrenCount");
+
+        let count = 0;
+        function render() {
+          if (countEl) countEl.textContent = String(count);
+          if (minusBtn) minusBtn.disabled = count <= 0;
+          if (plusBtn) plusBtn.disabled = count >= CHILDREN_MAX;
+        }
+        if (minusBtn) {
+          minusBtn.addEventListener("click", () => {
+            if (count > 0) count -= 1;
+            render();
+          });
+        }
+        if (plusBtn) {
+          plusBtn.addEventListener("click", () => {
+            if (count < CHILDREN_MAX) count += 1;
+            render();
+          });
+        }
+        render();
+
+        adultsBlock.insertAdjacentElement("afterend", childrenBlock);
+      }
+
+      // "Transportation" -> "Will you be self-driving?" yes/no. The existing
+      // radiogroup widget (Radix-style button[role=radio] + hidden native input +
+      // label, all already wired up by React for click/toggle behavior) has its
+      // selection fully taken over below; skip if this exact node was already
+      // wired (marked via data-rsvp-selfdriving-wired) so re-syncs on unrelated
+      // mutations don't re-attach duplicate listeners.
+      const selfDrivingLabel = labels.find((l) => /^(transportation\b|will you be self-driving\?)/i.test((l.textContent || "").trim()));
+      const selfDrivingGroup = selfDrivingLabel && selfDrivingLabel.parentElement
+        ? selfDrivingLabel.parentElement.querySelector('[role="radiogroup"]')
+        : null;
+
+      if (selfDrivingLabel && selfDrivingGroup && !selfDrivingGroup.hasAttribute("data-rsvp-selfdriving-wired")) {
+        selfDrivingLabel.textContent = "Will you be self-driving? *";
+
+        const options = Array.from(selfDrivingGroup.querySelectorAll('[role="radio"]'));
+        const newValues = ["yes", "no"];
+        const newLabels = ["Yes", "No"];
+        options.forEach((btn, index) => {
+          const newValue = newValues[index];
+          const newLabelText = newLabels[index];
+          if (!newValue) return;
+
+          const wrapper = btn.parentElement;
+          const hiddenInput = wrapper ? wrapper.querySelector('input[type="radio"]') : null;
+          const optionLabel = wrapper ? wrapper.querySelector("label") : null;
+
+          btn.setAttribute("value", newValue);
+          if (hiddenInput) hiddenInput.setAttribute("value", newValue);
+          if (optionLabel && newLabelText) optionLabel.textContent = newLabelText;
+        });
+
+        // The underlying Radix radio group always starts with its first option
+        // ("Yes") pre-selected with no easy way to change that default via
+        // clicks alone, and that selection needs to survive remounts too. So
+        // this group's selection is fully taken over here: React's own click
+        // handling is blocked (capture-phase preventDefault/stopPropagation,
+        // same technique used for the Maps button override) and replaced with
+        // plain state management, defaulting to "No" instead.
+        function setChecked(selected) {
+          options.forEach((opt) => {
+            const isSelected = opt === selected;
+            opt.setAttribute("aria-checked", isSelected ? "true" : "false");
+            opt.setAttribute("data-state", isSelected ? "checked" : "unchecked");
+            // The filled dot is a child <span><svg> that React only renders when
+            // checked (not a CSS toggle driven by data-state), so its actual
+            // presence has to be managed here too.
+            opt.innerHTML = isSelected ? CHECKED_DOT_HTML : "";
+            const hiddenInput = opt.parentElement ? opt.parentElement.querySelector('input[type="radio"]') : null;
+            if (hiddenInput) hiddenInput.checked = isSelected;
+          });
+        }
+
+        options.forEach((btn) => {
+          btn.addEventListener(
+            "click",
+            (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setChecked(btn);
+            },
+            true
+          );
+        });
+
+        // Default to "No".
+        setChecked(options[1] || null);
+        selfDrivingGroup.setAttribute("data-rsvp-selfdriving-wired", "true");
+      }
+    }
+
+    let attempts = 0;
+    const maxAttempts = 180;
+    let isSyncing = false;
+
+    function guardedSync(form) {
+      if (isSyncing) return;
+      isSyncing = true;
+      try {
+        syncRsvpQuestions(form);
+      } finally {
+        // Let the MutationObserver callback triggered by the mutations just
+        // made (if any) run and see isSyncing still true, then release it.
+        Promise.resolve().then(() => {
+          isSyncing = false;
+        });
+      }
+    }
+
+    function attachRedesign() {
+      attempts += 1;
+      const rsvpSection = document.querySelector("#rsvp");
+      const form = rsvpSection ? rsvpSection.querySelector("form") : null;
+
+      if (!rsvpSection || !form) {
+        if (attempts < maxAttempts) requestAnimationFrame(attachRedesign);
+        return;
+      }
+      if (rsvpSection.__templateRsvpQuestionsRedesigned) return;
+
+      guardedSync(form);
+
+      const observer = new MutationObserver(() => {
+        const currentForm = rsvpSection.querySelector("form");
+        if (currentForm) guardedSync(currentForm);
+      });
+      observer.observe(rsvpSection, { childList: true, subtree: true });
+
+      rsvpSection.__templateRsvpQuestionsRedesigned = true;
+    }
+
+    requestAnimationFrame(attachRedesign);
+  }
+
   function applyRsvpSubmission(config) {
     const rsvpConfig = config && config.content && config.content.rsvp;
     const endpoint =
@@ -791,15 +971,17 @@
             const fullNameEl = form.querySelector("#fullName");
             const messageEl = form.querySelector("#message");
             const websiteEl = form.querySelector("#website");
-            const guestCountEl = form.querySelector("span.w-10.text-center");
+            const adultCountEl = form.querySelector('[data-rsvp-field="adultCount"]');
+            const childrenCountEl = form.querySelector('[data-rsvp-field="childrenCount"]');
             const attendingGroup = findRadiogroupByLabelText(form, "attending");
-            const transportGroup = findRadiogroupByLabelText(form, "transportation");
+            const selfDrivingGroup = findRadiogroupByLabelText(form, "self-driving");
 
             const payload = {
               fullName: fullNameEl ? fullNameEl.value.trim() : "",
               attending: getRadioValue(attendingGroup),
-              guestCount: guestCountEl ? parseInt(guestCountEl.textContent.trim(), 10) : 1,
-              transportation: getRadioValue(transportGroup),
+              adultCount: adultCountEl ? parseInt(adultCountEl.textContent.trim(), 10) : 1,
+              childrenCount: childrenCountEl ? parseInt(childrenCountEl.textContent.trim(), 10) : 0,
+              selfDriving: getRadioValue(selfDrivingGroup),
               message: messageEl ? messageEl.value.trim() : "",
               website: websiteEl ? websiteEl.value : ""
             };
@@ -857,6 +1039,7 @@
     applyTransportModes(config);
     applyTransportMap();
     applyTransportDecor();
+    applyRsvpQuestionsRedesign();
     applyRsvpSubmission(config);
     hideRsvpPortrait();
     hideFooterCredit();

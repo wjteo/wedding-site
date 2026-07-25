@@ -6,7 +6,8 @@ const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
 
 const MAX_NAME_LENGTH = 120;
 const MAX_MESSAGE_LENGTH = 1000;
-const MAX_GUESTS = 10;
+const MAX_ADULTS = 10;
+const MAX_CHILDREN = 9;
 
 // Reuse the client connection across warm serverless invocations instead of
 // opening a new connection on every request.
@@ -55,8 +56,9 @@ module.exports = async (req, res) => {
 
   const fullName = typeof body.fullName === "string" ? body.fullName.trim() : "";
   const attending = body.attending === "yes" || body.attending === "no" ? body.attending : null;
-  const guestCount = Number.isInteger(body.guestCount) ? body.guestCount : NaN;
-  const transportation = isNonEmptyString(body.transportation, 60) ? body.transportation.trim() : "";
+  const adultCount = Number.isInteger(body.adultCount) ? body.adultCount : NaN;
+  const childrenCount = Number.isInteger(body.childrenCount) ? body.childrenCount : NaN;
+  const selfDriving = body.selfDriving === "yes" || body.selfDriving === "no" ? body.selfDriving : null;
   const message = typeof body.message === "string" ? body.message.trim() : "";
 
   if (!isNonEmptyString(fullName, MAX_NAME_LENGTH)) {
@@ -67,8 +69,16 @@ module.exports = async (req, res) => {
     res.status(400).json({ ok: false, error: "Attendance response is required" });
     return;
   }
-  if (!(guestCount >= 1 && guestCount <= MAX_GUESTS)) {
-    res.status(400).json({ ok: false, error: "Guest count must be between 1 and " + MAX_GUESTS });
+  if (!(adultCount >= 1 && adultCount <= MAX_ADULTS)) {
+    res.status(400).json({ ok: false, error: "Adult count must be between 1 and " + MAX_ADULTS });
+    return;
+  }
+  if (!(childrenCount >= 0 && childrenCount <= MAX_CHILDREN)) {
+    res.status(400).json({ ok: false, error: "Children count must be between 0 and " + MAX_CHILDREN });
+    return;
+  }
+  if (!selfDriving) {
+    res.status(400).json({ ok: false, error: "Please let us know if you'll be self-driving" });
     return;
   }
   if (message.length > MAX_MESSAGE_LENGTH) {
@@ -82,8 +92,9 @@ module.exports = async (req, res) => {
     await db.collection("rsvps").insertOne({
       fullName,
       attending,
-      guestCount,
-      transportation: transportation || null,
+      adultCount,
+      childrenCount,
+      selfDriving,
       message: message || null,
       submittedAt: new Date(),
       userAgent: req.headers["user-agent"] || null
