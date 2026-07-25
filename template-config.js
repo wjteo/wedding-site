@@ -296,6 +296,167 @@
     }
   }
 
+  function getGalleryFolder(config) {
+    const galleryConfig = config && config.content && config.content.gallery;
+    if (galleryConfig && typeof galleryConfig.folder === "string" && galleryConfig.folder.trim()) {
+      return galleryConfig.folder.replace(/^\/+|\/+$/g, "");
+    }
+    return "gallery";
+  }
+
+  function normalizeGalleryPath(folder, value) {
+    if (typeof value !== "string" || !value.trim()) return null;
+
+    const cleaned = value.trim();
+    if (/^https?:\/\//i.test(cleaned) || cleaned.startsWith("/")) {
+      return cleaned;
+    }
+
+    if (cleaned.startsWith("./")) {
+      return `${folder}/${cleaned.slice(2)}`;
+    }
+
+    if (cleaned.startsWith(`${folder}/`)) {
+      return cleaned;
+    }
+
+    return `${folder}/${cleaned}`;
+  }
+
+  async function fetchGalleryManifest(folder) {
+    try {
+      const response = await fetch(`${folder}/manifest.json`, { cache: "no-store" });
+      if (!response.ok) return [];
+
+      const payload = await response.json();
+      const files = Array.isArray(payload) ? payload : Array.isArray(payload.files) ? payload.files : [];
+      return files
+        .map((value) => normalizeGalleryPath(folder, value))
+        .filter((value) => typeof value === "string");
+    } catch (err) {
+      return [];
+    }
+  }
+
+  async function fetchGalleryDirectoryListing(folder) {
+    try {
+      const response = await fetch(`${folder}/`, { cache: "no-store" });
+      if (!response.ok) return [];
+
+      const html = await response.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+      const images = new Set();
+      const imagePattern = /\.(jpe?g|png|webp|gif|avif)$/i;
+
+      Array.from(doc.querySelectorAll("a[href]")).forEach((anchor) => {
+        const href = anchor.getAttribute("href") || "";
+        if (!imagePattern.test(href)) return;
+
+        const path = normalizeGalleryPath(folder, href.replace(/^\.\//, ""));
+        if (path) images.add(path);
+      });
+
+      return Array.from(images).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    } catch (err) {
+      return [];
+    }
+  }
+
+  async function resolveGalleryImagePaths(config) {
+    const folder = getGalleryFolder(config);
+    const galleryConfig = config && config.content && config.content.gallery;
+
+    if (galleryConfig && Array.isArray(galleryConfig.files) && galleryConfig.files.length > 0) {
+      const files = galleryConfig.files
+        .map((value) => normalizeGalleryPath(folder, value))
+        .filter((value) => typeof value === "string");
+      if (files.length > 0) return files;
+    }
+
+    const manifestFiles = await fetchGalleryManifest(folder);
+    if (manifestFiles.length > 0) return manifestFiles;
+
+    return fetchGalleryDirectoryListing(folder);
+  }
+
+  function isPrimaryGalleryWrapper(el) {
+    const img = el.querySelector("img");
+    if (!img) return false;
+    const alt = (img.getAttribute("alt") || "").trim();
+    return /^Gallery moment(\s+\d+)?$/i.test(alt);
+  }
+
+  function applyGalleryImagesToDom(paths) {
+    if (!Array.isArray(paths) || paths.length === 0) return;
+
+    const marquee = document.querySelector("#our-story .animate-marquee");
+    if (!marquee) return;
+
+    const wrappers = Array.from(marquee.children);
+    let primaryWrappers = wrappers.filter(isPrimaryGalleryWrapper);
+    if (primaryWrappers.length === 0) return;
+
+    // Remove the existing duplicated set (used for the seamless marquee loop);
+    // it gets rebuilt below to match the resized primary set.
+    wrappers.slice(primaryWrappers.length, primaryWrappers.length * 2).forEach((el) => el.remove());
+
+    // Grow or shrink the primary slot count to match the number of manifest photos,
+    // since the built marquee only ships with a fixed number of placeholder slots.
+    while (primaryWrappers.length < paths.length) {
+      const clone = primaryWrappers[primaryWrappers.length - 1].cloneNode(true);
+      primaryWrappers[primaryWrappers.length - 1].insertAdjacentElement("afterend", clone);
+      primaryWrappers.push(clone);
+    }
+    while (primaryWrappers.length > paths.length) {
+      primaryWrappers.pop().remove();
+    }
+
+    primaryWrappers.forEach((wrapper, index) => {
+      const img = wrapper.querySelector("img");
+      if (!img) return;
+      img.setAttribute("src", paths[index]);
+      img.setAttribute("alt", `Gallery moment ${index + 1}`);
+    });
+
+    primaryWrappers.forEach((wrapper) => {
+      const clone = wrapper.cloneNode(true);
+      const clonedImg = clone.querySelector("img");
+      if (clonedImg) clonedImg.setAttribute("alt", "");
+      marquee.appendChild(clone);
+    });
+  }
+
+  function applyGalleryFromFolder(config) {
+    let attempts = 0;
+    const maxAttempts = 180;
+
+    async function tryApply() {
+      attempts += 1;
+      const primaryImages = Array.from(document.querySelectorAll("#our-story .animate-marquee img")).filter((img) => {
+        const alt = (img.getAttribute("alt") || "").trim();
+        return alt.startsWith("Gallery moment");
+      });
+
+      if (primaryImages.length === 0) {
+        if (attempts < maxAttempts) {
+          requestAnimationFrame(tryApply);
+        }
+        return;
+      }
+
+      const paths = await resolveGalleryImagePaths(config);
+      if (!paths.length) {
+        console.warn("Template gallery not applied: no images found in gallery folder.");
+        return;
+      }
+
+      applyGalleryImagesToDom(paths);
+    }
+
+    requestAnimationFrame(tryApply);
+  }
+
   function findTransportSection() {
     const sections = Array.from(document.querySelectorAll("section"));
     return sections.find((section) => {
@@ -303,6 +464,145 @@
       if (!heading) return false;
       return heading.textContent && heading.textContent.trim() === "Wedding Day Transportation";
     });
+  }
+
+  const TRANSPORT_ICONS = {
+    bus: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bus w-4 h-4" aria-hidden="true"><path d="M8 6v6"></path><path d="M15 6v6"></path><path d="M2 12h19.6"></path><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"></path><circle cx="7" cy="18" r="2"></circle><path d="M9 18h5"></path><circle cx="16" cy="18" r="2"></circle></svg>',
+    "map-pin": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin w-4 h-4" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"></path><circle cx="12" cy="10" r="3"></circle></svg>',
+    parking: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-square-parking w-4 h-4" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 17V7h4a3 3 0 0 1 0 6H9"></path></svg>'
+  };
+
+  function applyTransportModes(config) {
+    const transportConfig = config && config.content && config.content.transport;
+    const modes = transportConfig && Array.isArray(transportConfig.modes) ? transportConfig.modes : null;
+    if (!modes || modes.length === 0) return;
+
+    const section = findTransportSection();
+    if (!section) return;
+
+    const grid = section.querySelector(".grid.sm\\:grid-cols-2, .grid[class*='grid-cols-']");
+    if (!grid) return;
+
+    let cards = Array.from(grid.children);
+    if (cards.length === 0) return;
+
+    // The compiled stylesheet only ships the grid-cols utilities actually used at
+    // build time (e.g. grid-cols-2), so a plain class swap to grid-cols-3 has no
+    // matching CSS rule. Inject the column count directly instead.
+    grid.classList.add("template-transport-grid");
+    const styleId = "template-transport-grid-style";
+    let styleEl = document.getElementById(styleId);
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = styleId;
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = `@media (min-width: 640px) { .template-transport-grid { grid-template-columns: repeat(${modes.length}, minmax(0, 1fr)); } }`;
+
+    while (cards.length < modes.length) {
+      const clone = cards[cards.length - 1].cloneNode(true);
+      cards[cards.length - 1].insertAdjacentElement("afterend", clone);
+      cards.push(clone);
+    }
+    while (cards.length > modes.length) {
+      cards.pop().remove();
+    }
+
+    cards.forEach((card, index) => {
+      const mode = modes[index];
+      if (!mode) return;
+
+      const iconWrap = card.children[0];
+      if (iconWrap) {
+        iconWrap.innerHTML = TRANSPORT_ICONS[mode.icon] || TRANSPORT_ICONS.bus;
+      }
+
+      const heading = card.querySelector("h3");
+      if (heading && typeof mode.title === "string") heading.textContent = mode.title;
+
+      const paragraphs = card.querySelectorAll("p");
+      if (paragraphs[0] && typeof mode.label === "string") paragraphs[0].textContent = mode.label;
+      if (paragraphs[1] && typeof mode.description === "string") paragraphs[1].textContent = mode.description;
+
+      const existingLink = card.querySelector(".template-mode-link");
+      if (existingLink) existingLink.remove();
+
+      if (mode.link && typeof mode.link.text === "string" && typeof mode.link.href === "string") {
+        const link = document.createElement("a");
+        link.href = mode.link.href;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = mode.link.text;
+        link.className =
+          "template-mode-link inline-flex items-center gap-2 font-body text-xs tracking-[0.15em] uppercase text-gold hover:text-sage-dark transition-colors border-b border-gold/40 hover:border-sage-dark pb-0.5 mt-2";
+        card.appendChild(link);
+      }
+    });
+  }
+
+  function applyTransportMap() {
+    const section = findTransportSection();
+    if (!section) return;
+
+    const paragraphs = Array.from(section.querySelectorAll("p"));
+    const target = paragraphs.find((p) => /please indicate your transportation/i.test(p.textContent || ""));
+    if (!target) return;
+
+    const img = document.createElement("img");
+    img.src = "/assets/annotated-mandai-map.png";
+    img.alt = "Map to Meranti Ballroom";
+    img.className = "w-full rounded-lg mb-6";
+    target.replaceWith(img);
+
+    const divider = img.previousElementSibling;
+    if (divider && divider.tagName === "DIV" && divider.classList.contains("h-px")) {
+      divider.remove();
+    }
+  }
+
+  function applyTransportDecor() {
+    const section = findTransportSection();
+    if (!section) return;
+
+    const shell = section.querySelector('img[src*="transport-shell"]');
+    const palms = section.querySelector('img[src*="transport-palms"]');
+    const surfboard = section.querySelector('img[src*="transport-surfboard-bag"]');
+    const car = section.querySelector('img[src*="transport-car"]');
+    const mapImg = section.querySelector('img[src*="annotated-mandai-map"]');
+
+    if (shell) shell.remove();
+    if (surfboard) surfboard.remove();
+
+    // Palms: bottom-right corner of the transport section's content area. Anchored to
+    // the inner max-w-3xl wrapper (not the outer <section>) so the base lines up with
+    // the visible card edge instead of floating in the section's bottom padding.
+    if (palms) {
+      palms.style.top = "";
+      const contentWrapper = section.querySelector(".max-w-3xl.mx-auto.relative") || section;
+      contentWrapper.appendChild(palms);
+      palms.className = "absolute bottom-0 -right-4 w-36 md:w-44 h-auto select-none pointer-events-none z-10";
+    }
+
+    // Car: overlaid at the boundary between the mode cards and the map, left-aligned.
+    // Absolutely positioned (not in normal flow) so it can overlap the card and the
+    // sections above/below it without pushing the map down.
+    if (car && mapImg && mapImg.parentElement) {
+      const container = mapImg.parentElement;
+      container.appendChild(car);
+      car.className = "absolute -left-4 w-32 md:w-40 h-auto select-none pointer-events-none z-20";
+
+      const positionCar = () => {
+        const carHeight = car.offsetHeight || 96;
+        car.style.top = `${mapImg.offsetTop - carHeight / 2}px`;
+      };
+
+      if (car.complete) {
+        positionCar();
+      } else {
+        car.addEventListener("load", positionCar, { once: true });
+      }
+      requestAnimationFrame(positionCar);
+    }
   }
 
   function applySectionToggles(config) {
@@ -423,6 +723,24 @@
     });
   }
 
+  function hideRsvpPortrait() {
+    const rsvp = document.querySelector("#rsvp");
+    if (!rsvp) return;
+    const img = rsvp.querySelector('img[src*="rsvp-portrait"]');
+    if (img && img.parentElement) {
+      img.parentElement.style.display = "none";
+    }
+  }
+
+  function hideFooterCredit() {
+    const footer = document.querySelector("footer");
+    if (!footer) return;
+    const link = footer.querySelector('a[href*="thedigitalyes.com"]');
+    if (link && link.parentElement) {
+      link.parentElement.style.display = "none";
+    }
+  }
+
   function applyConfig(config) {
     setMeta(config);
     applySectionToggles(config);
@@ -430,7 +748,13 @@
     applyWeddingDate(config);
     applyWeddingEventsMap(config);
     applyOurStoryContent(config);
+    applyGalleryFromFolder(config);
     applyIntroConfig(config);
+    applyTransportModes(config);
+    applyTransportMap();
+    applyTransportDecor();
+    hideRsvpPortrait();
+    hideFooterCredit();
   }
 
   async function loadConfig() {

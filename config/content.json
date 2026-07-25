@@ -110,7 +110,38 @@
     },
     "transport": {
       "enabled": true,
-      "text": {}
+      "text": {
+        "address": {
+          "selector": ".flex.flex-col.items-center.gap-2.text-center p",
+          "text": "Meranti Ballroom, Level B1, East Block\nMandai Rainforest Resort\n60 Mandai Lake Rd,\nSingapore 729979"
+        },
+        "mapsLink": {
+          "selector": ".flex.flex-col.items-center.gap-2.text-center a[href*=\"google.com/maps\"]",
+          "attribute": "href",
+          "text": "https://www.google.com/maps/search/?api=1&query=Mandai+Rainforest+Resort+Singapore"
+        }
+      },
+      "modes": [
+        {
+          "icon": "map-pin",
+          "title": "Drop-off",
+          "label": "At hotel lobby, L1",
+          "description": "Head down to level B1 at the East Block to get to Meranti Ballroom."
+        },
+        {
+          "icon": "parking",
+          "title": "Parking",
+          "label": "Near the West Block",
+          "description": "After parking, cut across the West Block and the Main Block to get to the East Block.",
+          "link": { "text": "Getting there by car", "href": "/assets/driving.pdf" }
+        },
+        {
+          "icon": "bus",
+          "title": "Shuttle Service",
+          "label": "From Khatib MRT",
+          "description": "Take Mandai Khatib Bus (M2) and alight at Mandai Wildlife EAST. Bus arrives approximately every 15 minutes and the fare is $2.50 per passenger."
+        }
+      ]
     },
     "accommodations": {
       "enabled": false,
@@ -126,7 +157,12 @@
     },
     "footer": {
       "enabled": true,
-      "text": {}
+      "text": {
+        "names": {
+          "selector": "footer p.font-script",
+          "html": "Wenjie <span class=\"italic\">&amp;</span> Wendy"
+        }
+      }
     }
   }
 }
