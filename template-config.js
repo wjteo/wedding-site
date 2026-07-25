@@ -597,7 +597,11 @@
       palms.style.top = "";
       const contentWrapper = section.querySelector(".max-w-3xl.mx-auto.relative") || section;
       contentWrapper.appendChild(palms);
-      palms.className = "absolute bottom-0 -right-4 w-36 md:w-44 h-auto select-none pointer-events-none z-10";
+      palms.className = "absolute bottom-0 -right-4 h-auto select-none pointer-events-none z-10";
+      // Fluid width (rather than a Tailwind breakpoint step) so the trees shrink
+      // continuously as the viewport narrows, instead of staying large right up
+      // until one breakpoint and obstructing the address text on small screens.
+      palms.style.width = "clamp(64px, 18vw, 176px)";
     }
 
     // Car: overlaid at the boundary between the mode cards and the map, left-aligned.
