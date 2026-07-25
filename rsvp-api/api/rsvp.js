@@ -32,6 +32,15 @@ function isNonEmptyString(value, maxLength) {
   return typeof value === "string" && value.trim().length > 0 && value.length <= maxLength;
 }
 
+function sanitizeNameList(value, maxCount) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((v) => typeof v === "string")
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0 && v.length <= MAX_NAME_LENGTH)
+    .slice(0, maxCount);
+}
+
 module.exports = async (req, res) => {
   setCorsHeaders(res);
 
@@ -60,6 +69,8 @@ module.exports = async (req, res) => {
   const childrenCount = Number.isInteger(body.childrenCount) ? body.childrenCount : NaN;
   const selfDriving = body.selfDriving === "yes" || body.selfDriving === "no" ? body.selfDriving : null;
   const message = typeof body.message === "string" ? body.message.trim() : "";
+  const additionalGuestNames = sanitizeNameList(body.additionalGuestNames, MAX_ADULTS - 1);
+  const childrenNames = sanitizeNameList(body.childrenNames, MAX_CHILDREN);
 
   if (!isNonEmptyString(fullName, MAX_NAME_LENGTH)) {
     res.status(400).json({ ok: false, error: "A valid full name is required" });
@@ -93,7 +104,9 @@ module.exports = async (req, res) => {
       fullName,
       attending,
       adultCount,
+      additionalGuestNames,
       childrenCount,
+      childrenNames,
       selfDriving,
       message: message || null,
       submittedAt: new Date(),

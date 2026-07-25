@@ -761,16 +761,31 @@
       const adultsLabel = labels.find((l) => /number of (guests|adults) attending/i.test(l.textContent || ""));
       const adultsBlock = adultsLabel ? adultsLabel.closest(".space-y-3") : null;
 
-      // Clean up any previous clone first so a remount never leaves an orphaned
-      // or duplicated children counter behind.
-      form.querySelectorAll(".template-children-count").forEach((el) => el.remove());
+      // Skip if a valid children counter is already sitting right after the
+      // current adults block: this sync also re-runs every time the counter's
+      // own +/- buttons are clicked (their DOM mutations trigger the same
+      // MutationObserver), and recreating it unconditionally on every run would
+      // reset the count back to 0 on every click. Only rebuild when it's
+      // actually missing or stale (e.g. after a real remount).
+      const existingChildrenBlock =
+        adultsBlock && adultsBlock.nextElementSibling && adultsBlock.nextElementSibling.classList.contains("template-children-count")
+          ? adultsBlock.nextElementSibling
+          : null;
+
+      if (!existingChildrenBlock) {
+        // Clean up any stale/orphaned clone left over from a remount before
+        // creating a fresh one.
+        form.querySelectorAll(".template-children-count").forEach((el) => el.remove());
+      }
 
       if (adultsLabel && adultsBlock) {
         adultsLabel.textContent = "Number of adults attending *";
 
         const adultsCountEl = adultsBlock.querySelector("span.w-10.text-center");
         if (adultsCountEl) adultsCountEl.setAttribute("data-rsvp-field", "adultCount");
+      }
 
+      if (adultsLabel && adultsBlock && !existingChildrenBlock) {
         const childrenBlock = adultsBlock.cloneNode(true);
         childrenBlock.classList.add("template-children-count");
 
@@ -779,17 +794,64 @@
           childrenLabel.textContent = "Number of children (below 12 years old) attending *";
         }
 
+        // adultsBlock may currently include its own "Guest 2/3 name" fields
+        // (added by React once adult count > 1) if the adult count happened to
+        // be above 1 at clone time; strip that out before adding our own
+        // independent "Child N name" fields below.
+        const strayNamesContainer = childrenBlock.querySelector(".space-y-3.pt-2");
+        if (strayNamesContainer) strayNamesContainer.remove();
+
         const buttons = childrenBlock.querySelectorAll("button");
         const minusBtn = buttons[0];
         const plusBtn = buttons[1];
         const countEl = childrenBlock.querySelector("span.w-10.text-center");
         if (countEl) countEl.setAttribute("data-rsvp-field", "childrenCount");
 
+        const namesContainer = document.createElement("div");
+        namesContainer.className = "space-y-3 pt-2 template-children-names";
+        childrenBlock.appendChild(namesContainer);
+
+        const nameInputTemplate = adultsBlock.querySelector('input[id="fullName"]');
+        const nameInputClass = nameInputTemplate
+          ? nameInputTemplate.className
+          : "flex h-10 w-full rounded-md border px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm mt-2 bg-ivory border-gold/30 text-sage-dark placeholder:text-sage-dark/50 focus:border-gold";
+        const labelTemplate = adultsLabel;
+        const labelClass = labelTemplate ? labelTemplate.className : "text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-sage-dark font-medium";
+
+        // Mirrors the adult "Guest N name" fields that already appear/disappear
+        // as the (React-controlled) adult stepper changes: add/remove one
+        // "Child N name" field per child as this independently-managed stepper
+        // changes, always trimming/growing from the tail so earlier entries
+        // keep whatever the guest already typed.
+        function renderNameFields() {
+          const existingWrappers = Array.from(namesContainer.children);
+          while (existingWrappers.length > count) {
+            namesContainer.removeChild(existingWrappers.pop());
+          }
+          for (let i = existingWrappers.length + 1; i <= count; i++) {
+            const wrapper = document.createElement("div");
+            const label = document.createElement("label");
+            label.className = labelClass;
+            label.setAttribute("for", `child-${i}`);
+            label.textContent = `Child ${i} name *`;
+            const input = document.createElement("input");
+            input.className = nameInputClass;
+            input.id = `child-${i}`;
+            input.required = true;
+            input.maxLength = 120;
+            input.placeholder = "Enter child's full name";
+            wrapper.appendChild(label);
+            wrapper.appendChild(input);
+            namesContainer.appendChild(wrapper);
+          }
+        }
+
         let count = 0;
         function render() {
           if (countEl) countEl.textContent = String(count);
           if (minusBtn) minusBtn.disabled = count <= 0;
           if (plusBtn) plusBtn.disabled = count >= CHILDREN_MAX;
+          renderNameFields();
         }
         if (minusBtn) {
           minusBtn.addEventListener("click", () => {
@@ -976,11 +1038,21 @@
             const attendingGroup = findRadiogroupByLabelText(form, "attending");
             const selfDrivingGroup = findRadiogroupByLabelText(form, "self-driving");
 
+            // Additional adult guest names (Guest 2, Guest 3, ...) that React
+            // adds as the adult stepper increases, plus this template's own
+            // "Child N name" fields added alongside the children stepper.
+            const additionalGuestNames = Array.from(form.querySelectorAll('input[id^="guest-"]')).map((el) =>
+              el.value.trim()
+            );
+            const childrenNames = Array.from(form.querySelectorAll('input[id^="child-"]')).map((el) => el.value.trim());
+
             const payload = {
               fullName: fullNameEl ? fullNameEl.value.trim() : "",
               attending: getRadioValue(attendingGroup),
               adultCount: adultCountEl ? parseInt(adultCountEl.textContent.trim(), 10) : 1,
+              additionalGuestNames,
               childrenCount: childrenCountEl ? parseInt(childrenCountEl.textContent.trim(), 10) : 0,
+              childrenNames,
               selfDriving: getRadioValue(selfDrivingGroup),
               message: messageEl ? messageEl.value.trim() : "",
               website: websiteEl ? websiteEl.value : ""
