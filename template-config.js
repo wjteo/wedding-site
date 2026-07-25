@@ -416,14 +416,14 @@
     // from each image's own aspect ratio). Before an image loads, the browser
     // uses its width/height attributes (4:5, from the original template photos)
     // to reserve space; once the actual photo loads, real user photos are
-    // mostly square, so the box visibly widens. With 44 images loading
-    // progressively (loading="lazy"), each one widening the marquee track mid
-    // scroll causes the CSS animation's translateX(-50%) - resolved against the
-    // track's *current* width - to jump every time. Locking the box to a fixed
-    // aspect ratio (matching the original 320x400 attributes) makes every
-    // image's rendered width deterministic from the start, independent of its
-    // real dimensions, so the track width never changes after load.
-    const GALLERY_ASPECT_RATIO = "4 / 5";
+    // square, so the box visibly widened. With 44 images loading progressively
+    // (loading="lazy"), each one widening the marquee track mid-scroll caused
+    // the CSS animation's translateX(-50%) - resolved against the track's
+    // *current* width - to jump every time. Locking the box to a fixed aspect
+    // ratio (matching the actual square photos) makes every image's rendered
+    // width deterministic from the start, so the track width never changes
+    // after load.
+    const GALLERY_ASPECT_RATIO = "1 / 1";
 
     primaryWrappers.forEach((wrapper, index) => {
       const img = wrapper.querySelector("img");
