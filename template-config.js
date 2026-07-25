@@ -610,7 +610,11 @@
     if (car && mapImg && mapImg.parentElement) {
       const container = mapImg.parentElement;
       container.appendChild(car);
-      car.className = "absolute -left-4 w-32 md:w-40 h-auto select-none pointer-events-none z-20";
+      car.className = "absolute -left-4 h-auto select-none pointer-events-none z-20";
+      // Same fluid-width approach as the palms above, scaled proportionally to
+      // the car's previous size, so it also shrinks smoothly on narrow screens
+      // instead of jumping between two fixed widths.
+      car.style.width = "clamp(56px, 16vw, 160px)";
 
       const positionCar = () => {
         const carHeight = car.offsetHeight || 96;
