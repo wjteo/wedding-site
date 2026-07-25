@@ -88,7 +88,9 @@ module.exports = async (req, res) => {
     res.status(400).json({ ok: false, error: "Children count must be between 0 and " + MAX_CHILDREN });
     return;
   }
-  if (!selfDriving) {
+  // The self-driving question is only shown (and answerable) in the form when
+  // attending, so only require it in that case.
+  if (attending === "yes" && !selfDriving) {
     res.status(400).json({ ok: false, error: "Please let us know if you'll be self-driving" });
     return;
   }
